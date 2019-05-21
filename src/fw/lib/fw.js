@@ -21,7 +21,7 @@
  * CDDL HEADER END
  *
  *
- * Copyright (c) 2018, Joyent, Inc. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  *
  *
  * fwadm: Main entry points
@@ -31,8 +31,6 @@ var assert = require('assert-plus');
 var clone = require('clone');
 var filter = require('./filter');
 var fs = require('fs');
-// XXX not ok for firewaller-agent because this won't exist on old CNs
-var features = require('/usr/node/node_modules/illumos-features');
 var mkdirp = require('mkdirp');
 var mod_addr = require('ip6addr');
 var mod_ipf = require('./ipf');
@@ -70,7 +68,6 @@ var IPF6_CONF_OLD = '%s/config/ipf6.conf.old';
 var KEEP_FRAGS = ' keep frags';
 var KEEP_STATE = ' keep state';
 var NOT_RUNNING_MSG = 'Could not find running zone';
-var FEATURE_INOUT_UUID = 'com.joyent.driver.ipf.rules.in-out-uuid';
 // VM fields that affect filtering
 var VM_FIELDS = [
     'firewall_enabled',
@@ -108,6 +105,9 @@ var v6fallbacks = fallbacks.concat([
     'pass out quick proto ipv6-icmp from any to any keep state',
     'pass out proto ipv6-icmp from any to any']);
 
+// Do not use directly - use haveIpfEventLogger() instead.
+var haveDevIpfEv = undefined;
+var DEV_IPFEV = '/dev/ipfev';
 
 // --- Internal helper functions
 
@@ -122,6 +122,22 @@ function assertStringOrObject(obj, name) {
     }
 }
 
+
+/**
+ * Determine if /dev/ipfev exists, caching the result for future calls in the
+ * global variable haveDevIpfEv.
+ */
+function haveIpfEventLogger() {
+    if (haveDevIpfEv === undefined) {
+        try {
+            fs.statSync(DEV_IPFEV)
+            haveDevIpfEv = true;
+        } catch (_err) {
+            haveDevIpfEv = false;
+        }
+    }
+    return haveDevIpfEv;
+}
 
 /**
  * For a rule and a direction, return whether or not we actually need to
@@ -1087,7 +1103,7 @@ function ipfRuleObj(opts) {
     var ipfProto = (rule.protocol === 'icmp6') ? 'ipv6-icmp' : rule.protocol;
 
     var readtags = [];
-    if (features.feature[FEATURE_INOUT_UUID]) {
+    if (haveIpfEventLogger()) {
         if (rule.uuid) {
             readtags.push(util.format('uuid=%s', rule.uuid));
         }
@@ -1705,11 +1721,6 @@ function applyChanges(opts, log, callback) {
 
     pipeline({
     funcs: [
-        // Determine which platform-specific features are available
-        function loadFeatures(res, cb) {
-            features.load({log: log}, cb);
-        },
-
         // Generate the ipf files for each VM
         function reloadPlan(res, cb) {
             prepareIPFdata({
