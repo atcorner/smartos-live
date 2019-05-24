@@ -129,12 +129,7 @@ function assertStringOrObject(obj, name) {
  */
 function haveIpfEventLogger() {
     if (haveDevIpfEv === undefined) {
-        try {
-            fs.statSync(DEV_IPFEV)
-            haveDevIpfEv = true;
-        } catch (_err) {
-            haveDevIpfEv = false;
-        }
+        haveDevIpfEv = fs.existsSync(DEV_IPFEV);
     }
     return haveDevIpfEv;
 }
@@ -152,8 +147,8 @@ function noRulesNeeded(dir, rule) {
         return false;
     }
 
-    if ((dir === 'from' && rule.action === 'allow')
-        || (dir === 'to' && rule.action === 'block')) {
+    if ((dir === 'from' && rule.action === 'allow') ||
+        (dir === 'to' && rule.action === 'block')) {
         return true;
     }
     return false;
@@ -245,16 +240,16 @@ function getChangingRules(rules, existingRules, cb) {
  */
 function getAffectedRules(new_vms, log) {
     return function _isAffectedRule(rule) {
-        if (rule.action === 'allow'
-            && vmsOnSide(new_vms, rule, 'from', log).length > 0) {
-            return rule.to.wildcards.indexOf('vmall') !== -1
-                || rule.to.tags.length > 0
-                || rule.to.vms.length > 0;
-        } else if (rule.action === 'block'
-            && vmsOnSide(new_vms, rule, 'to', log).length > 0) {
-            return rule.from.wildcards.indexOf('vmall') !== -1
-                || rule.from.tags.length > 0
-                || rule.from.vms.length > 0;
+        if (rule.action === 'allow' &&
+            vmsOnSide(new_vms, rule, 'from', log).length > 0) {
+            return rule.to.wildcards.indexOf('vmall') !== -1 ||
+                rule.to.tags.length > 0 ||
+                rule.to.vms.length > 0;
+        } else if (rule.action === 'block' &&
+            vmsOnSide(new_vms, rule, 'to', log).length > 0) {
+            return rule.from.wildcards.indexOf('vmall') !== -1 ||
+                rule.from.tags.length > 0 ||
+                rule.from.vms.length > 0;
         }
         return false;
     };
@@ -373,19 +368,19 @@ function createUpdatedRules(opts, log, callback) {
             origRule = originals[rule.uuid].serialize();
             mergedRule = mergeObjects(rule, origRule);
 
-            if (!(hasKey(rule, 'owner_uuid')
-                && hasKey(rule, 'global'))) {
+            if (!(hasKey(rule, 'owner_uuid') &&
+                hasKey(rule, 'global'))) {
                 // If both owner_uuid and global are set - let
                 // this bubble up the appropriate error in createRules()
 
-                if (hasKey(rule, 'owner_uuid')
-                    && hasKey(origRule, 'global')) {
+                if (hasKey(rule, 'owner_uuid') &&
+                    hasKey(origRule, 'global')) {
                     // Updating from global -> owner_uuid rule
                     delete mergedRule.global;
                 }
 
-                if (hasKey(rule, 'global')
-                    && hasKey(origRule, 'owner_uuid')) {
+                if (hasKey(rule, 'global') &&
+                    hasKey(origRule, 'owner_uuid')) {
                     // Updating from owner_uuid -> global rule
                     delete mergedRule.owner_uuid;
                 }
@@ -860,10 +855,8 @@ function validateRules(vms, rvms, rules, log, callback) {
                 sideData[rule.uuid][dir].vms[vm] = 1;
             }
             delete rulesLeft[rule.uuid];
-
         } else if (hasKey(rvms[type], t)) {
             delete rulesLeft[rule.uuid];
-
         } else {
             sideData[rule.uuid][dir].missing[type][t] = 1;
         }
@@ -884,8 +877,8 @@ function validateRules(vms, rvms, rules, log, callback) {
         DIRECTIONS.forEach(function (dir) {
             var otherSide = (dir == 'to' ? 'from' : 'to');
 
-            if (!hasKey(missing, dir) || objEmpty(missing[dir].vms)
-                || !hasKey(missing, otherSide)) {
+            if (!hasKey(missing, dir) || objEmpty(missing[dir].vms) ||
+                !hasKey(missing, otherSide)) {
                 return;
             }
 
@@ -918,9 +911,8 @@ function protoTarget(rule, target) {
         return 'icmp-type ' + typeArr[0]
             + (typeArr.length === 1 ? '' : ' code ' + typeArr[1]);
     } else {
-        if (hasKey(target, 'start')
-            && hasKey(target, 'end')) {
-
+        if (hasKey(target, 'start') &&
+            hasKey(target, 'end')) {
             return 'port ' + target.start + ' : ' + target.end;
         } else {
             return 'port = ' + target;
@@ -1138,10 +1130,8 @@ function ipfRuleObj(opts) {
                 dir === 'from' ? 'out' : 'in',
                 ipfProto,
                 protoTarget(rule, t));
-            if (rule.protocol !== 'icmp6')
-                sortObj.v4text.push(wild);
-            if (rule.protocol !== 'icmp')
-                sortObj.v6text.push(wild);
+            if (rule.protocol !== 'icmp6') { sortObj.v4text.push(wild); }
+            if (rule.protocol !== 'icmp') { sortObj.v6text.push(wild); }
         });
 
         return sortObj;
@@ -1151,8 +1141,8 @@ function ipfRuleObj(opts) {
         var isv6 = target.indexOf(':') !== -1;
 
         // Don't generate rules for ICMPv4/IPv6 or ICMPv6/IPv4
-        if ((isv6 && rule.protocol === 'icmp')
-            || (!isv6 && rule.protocol === 'icmp6')) {
+        if ((isv6 && rule.protocol === 'icmp') ||
+            (!isv6 && rule.protocol === 'icmp6')) {
             return;
         }
 
@@ -1166,7 +1156,7 @@ function ipfRuleObj(opts) {
                     ipfProto,
                     dir === 'to' ? target : 'any',
                     dir === 'to' ? 'any' : target,
-                    protoTarget(rule, t)))
+                    protoTarget(rule, t)));
         });
     });
 
@@ -1291,9 +1281,9 @@ function prepareIPFdata(opts, log, callback) {
         conf[vm].sort(compareRules).forEach(function (sortObj) {
             assert.string(sortObj.allTags, 'sortObj.allTags');
             var ktxt = KEEP_FRAGS;
-            if (sortObj.allTags !== ''
-                || (sortObj.direction === 'from' && sortObj.action === 'allow')
-                || (sortObj.direction === 'to' && iks[sortObj.protocol])) {
+            if (sortObj.allTags !== '' ||
+                (sortObj.direction === 'from' && sortObj.action === 'allow') ||
+                (sortObj.direction === 'to' && iks[sortObj.protocol])) {
                 ktxt += KEEP_STATE + sortObj.allTags;
             }
 
@@ -1364,8 +1354,8 @@ function vmsOnSide(allVMs, rule, dir, log) {
             }
 
             Object.keys(vmList).forEach(function (uuid) {
-                if (hasKey(rule, 'owner_uuid')
-                    && (rule.owner_uuid != vmList[uuid].owner_uuid)) {
+                if (hasKey(rule, 'owner_uuid') &&
+                    (rule.owner_uuid != vmList[uuid].owner_uuid)) {
                     return;
                 }
 
@@ -1432,8 +1422,8 @@ function rulesFromOtherSide(rule, dir, localVMs, remoteVMs) {
             }
 
             [localVMs, remoteVMs].forEach(function (lookup) {
-                if (!hasKey(lookup, lookupTypePlural)
-                    || !hasKey(lookup[lookupTypePlural], value)) {
+                if (!hasKey(lookup, lookupTypePlural) ||
+                    !hasKey(lookup[lookupTypePlural], value)) {
                     return;
                 }
 
@@ -1446,8 +1436,8 @@ function rulesFromOtherSide(rule, dir, localVMs, remoteVMs) {
                 }
 
                 forEachKey(vmList, function (uuid, vm) {
-                    if (rule.owner_uuid && vm.owner_uuid
-                        && vm.owner_uuid != rule.owner_uuid) {
+                    if (rule.owner_uuid && vm.owner_uuid &&
+                        vm.owner_uuid != rule.owner_uuid) {
                         return;
                     }
 
@@ -1733,8 +1723,8 @@ function applyChanges(opts, log, callback) {
 
         // Save the remote VMs
         function saveVMs(res, cb) {
-            if (opts.dryrun || !opts.save || !opts.save.remoteVMs
-                || objEmpty(opts.save.remoteVMs)) {
+            if (opts.dryrun || !opts.save || !opts.save.remoteVMs ||
+                objEmpty(opts.save.remoteVMs)) {
                 return cb(null);
             }
             mod_rvm.save(opts.save.remoteVMs, log, cb);
@@ -1742,8 +1732,8 @@ function applyChanges(opts, log, callback) {
 
         // Save rule files (if specified)
         function save(res, cb) {
-            if (opts.dryrun || !opts.save || !opts.save.rules
-                || opts.save.rules.length === 0) {
+            if (opts.dryrun || !opts.save || !opts.save.rules ||
+                opts.save.rules.length === 0) {
                 return cb(null);
             }
             saveRules(opts.save.rules, log, cb);
@@ -1751,8 +1741,8 @@ function applyChanges(opts, log, callback) {
 
         // Delete rule files (if specified)
         function delRules(res, cb) {
-            if (opts.dryrun || !opts.del || !opts.del.rules
-                || opts.del.rules.length === 0) {
+            if (opts.dryrun || !opts.del || !opts.del.rules ||
+                opts.del.rules.length === 0) {
                 return cb(null);
             }
             deleteRules(opts.del.rules, log, cb);
@@ -1760,8 +1750,8 @@ function applyChanges(opts, log, callback) {
 
         // Delete remote VMs (if specified)
         function delRVMs(res, cb) {
-            if (opts.dryrun || !opts.del || !opts.del.rvms
-                || opts.del.rvms.length === 0) {
+            if (opts.dryrun || !opts.del || !opts.del.rvms ||
+                opts.del.rvms.length === 0) {
                 return cb(null);
             }
             mod_rvm.del(opts.del.rvms, log, cb);
@@ -1860,8 +1850,8 @@ function add(opts, callback) {
         var optRules = opts.rules || [];
         var optLocalVMs = opts.localVMs || [];
         var optRemoteVMs = opts.remoteVMs || [];
-        if (optRules.length === 0 && optLocalVMs.length === 0
-            && optRemoteVMs.length === 0) {
+        if (optRules.length === 0 && optLocalVMs.length === 0 &&
+            optRemoteVMs.length === 0) {
             throw new Error(
                 'Payload must contain one of: rules, localVMs, remoteVMs');
         }
@@ -2014,7 +2004,6 @@ function del(opts, callback) {
             throw new Error(
                 'Payload must contain one of: rvmUUIDs, uuids');
         }
-
     } catch (err) {
         return callback(err);
     }
@@ -2216,7 +2205,7 @@ function listRemoteVMs(opts, callback) {
 
             // XXX: support sorting by other fields, filtering
             var sortFn = function _sort(a, b) {
-                return (a.uuid > b.uuid) ? 1: -1;
+                return (a.uuid > b.uuid) ? 1 : -1;
             };
 
             log.debug('listRemoteVMs: finish');
@@ -2271,7 +2260,7 @@ function listRules(opts, callback) {
             // XXX: support sorting by other fields, filtering
             // (eg: enabled=true vm=<uuid>)
             var sortFn = function _defaultSort(a, b) {
-                return (a.uuid > b.uuid) ? 1: -1;
+                return (a.uuid > b.uuid) ? 1 : -1;
             };
             var mapFn = function _defaultMap(r) {
                 return r.serialize();
@@ -2557,8 +2546,8 @@ function update(opts, callback) {
         var optRules = opts.rules || [];
         var optLocalVMs = opts.localVMs || [];
         var optRemoteVMs = opts.remoteVMs || [];
-        if (optRules.length === 0 && optLocalVMs.length === 0
-            && optRemoteVMs.length === 0) {
+        if (optRules.length === 0 && optLocalVMs.length === 0 &&
+            optRemoteVMs.length === 0) {
             throw new Error(
                 'Payload must contain one of: rules, localVMs, remoteVMs');
         }
@@ -2742,7 +2731,6 @@ function getRemoteTargets(opts, callback) {
         if (opts.rules.length === 0) {
             throw new Error('Must specify rules');
         }
-
     } catch (err) {
         return callback(err);
     }
@@ -2991,8 +2979,8 @@ function validatePayload(opts, callback) {
         var optRules = opts.rules || [];
         var optLocalVMs = opts.localVMs || [];
         var optRemoteVMs = opts.remoteVMs || [];
-        if (optRules.length === 0 && optLocalVMs.length === 0
-            && optRemoteVMs.length === 0) {
+        if (optRules.length === 0 && optLocalVMs.length === 0 &&
+            optRemoteVMs.length === 0) {
             throw new Error(
                 'Payload must contain one of: rules, localVMs, remoteVMs');
         }
