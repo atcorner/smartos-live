@@ -1273,13 +1273,16 @@ function prepareIPFdata(opts, log, callback) {
             '# AND MAY BE OVERWRITTEN AT ANY TIME.',
             '#',
             '# File generated at ' + date.toString(),
-            '#',
-            ''];
+            '#'
+        ];
+        if (haveIpfEventLogger()) {
+            ipf4Conf.push('# smartos_ipf_version 2');
+        }
+        ipf4Conf.push('#', '');
         var ipf6Conf = ipf4Conf.slice();
         var iks = hasKey(keepInboundState, vm) ? keepInboundState[vm] : {};
 
         conf[vm].sort(compareRules).forEach(function (sortObj) {
-            assert.string(sortObj.allTags, 'sortObj.allTags');
             var ktxt = KEEP_FRAGS;
             if (sortObj.allTags !== '' ||
                 (sortObj.direction === 'from' && sortObj.action === 'allow') ||
